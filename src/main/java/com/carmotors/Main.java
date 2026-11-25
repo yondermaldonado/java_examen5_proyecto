@@ -1,5 +1,7 @@
 package com.carmotors;
 
+import com.carmotors.servicio.PublicadorOrdenServicio;
+import com.carmotors.servicio.NotificacionClienteService;
 import com.carmotors.config.ConexionFactory;
 import com.carmotors.config.ConfiguracionAplicacion;
 import com.carmotors.controlador.AlertasInventarioController;
@@ -110,7 +112,7 @@ public final class Main {
 
     public static void main(String[] args) {
         Consola consola = new Consola(new Scanner(System.in, StandardCharsets.UTF_8), System.out);
-    ensamblar(consola).iniciar();
+        ensamblar(consola).iniciar();
     }
 
     public static MenuPrincipal ensamblar(Consola consola) {
@@ -131,6 +133,14 @@ public final class Main {
 
         OrdenServicioDAO ordenDao = new OrdenServicioDAOFactory().obtenerDAO();
         PublicadorInventario publicador = new PublicadorInventario();
+        // Observer para notificaciones de clientes.
+        PublicadorOrdenServicio publicadorOrden =
+                new PublicadorOrdenServicio();
+
+        NotificacionClienteService notificacionCliente =
+                new NotificacionClienteService();
+
+        publicadorOrden.suscribir(notificacionCliente);
         ReservasOrdenService reservas = new ReservasOrdenService(
                 ordenDao, new InventarioReservasFactory().obtenerDAO(), conexiones, reloj, publicador);
 
@@ -138,15 +148,19 @@ public final class Main {
                 ConfiguracionAplicacion.TASA_IMPUESTO);
         OrdenServicioService ordenService = new OrdenServicioService(
                 ordenDao, new VehiculoConsultaImpl(vehiculoDao), conexiones, reloj,
-                reservas, facturacion, publicador);
+                reservas, facturacion, publicador, publicadorOrden);
         OrdenServicioController ordenCtrl = new OrdenServicioController(ordenService);
 
         // Un solo conjunto de servicios/DAOs sirve a ambas vistas operativas.
         TecnicoService tecnicoService = new TecnicoService(
                 new TecnicoDAOFactory(), conexiones);
         TecnicoController tecnicoCtrl = new TecnicoController(tecnicoService);
-        AsignacionTecnicoService asignacionService = new AsignacionTecnicoService(
-                new ServicioTecnicoDAOFactory(), conexiones);
+        AsignacionTecnicoService asignacionService =
+                new AsignacionTecnicoService(
+                        new ServicioTecnicoDAOFactory(),
+                        conexiones,
+                        publicadorOrden
+                );
         AsignacionTecnicoController asignacionCtrl = new AsignacionTecnicoController(asignacionService);
         ConsultaTallerController consultaTaller = new ConsultaTallerController(
                 tecnicoService, asignacionService, ordenService);
